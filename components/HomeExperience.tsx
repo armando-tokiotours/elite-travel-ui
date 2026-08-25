@@ -8,6 +8,8 @@ import { InteractiveMap, type MapFilter } from "@/components/InteractiveMap";
 import { FieldNotesGrid } from "@/components/FieldNotesGrid";
 import { ReadingDrawer } from "@/components/ReadingDrawer";
 import { SearchModal } from "@/components/SearchModal";
+import { useResponsiveVideo } from "@/hooks/useResponsiveVideo";
+import { VIDEO_SLOTS } from "@/lib/videoConfig";
 import type { FieldNote } from "@/lib/wordpress";
 
 interface HomeExperienceProps {
@@ -77,26 +79,56 @@ export function HomeExperience({ notes }: HomeExperienceProps) {
 }
 
 function Hero() {
+  const { kind, src, isMobile } = useResponsiveVideo(VIDEO_SLOTS.hero);
+  const poster =
+    "https://images.unsplash.com/photo-1488646953014-85cb44e25828?w=1920&q=80";
+
   return (
     <section className="relative flex min-h-[100svh] items-end overflow-hidden">
-      {/* Full-bleed video plane */}
+      {/* Full-bleed responsive video — MP4 file or iframe provider */}
       <div className="absolute inset-0">
-        <video
-          className="h-full w-full scale-105 object-cover blur-[1.5px]"
-          autoPlay
-          muted
-          loop
-          playsInline
-          poster="https://images.unsplash.com/photo-1488646953014-85cb44e25828?w=1920&q=80"
-        >
-          <source
-            src="https://cdn.coverr.co/videos/coverr-aerial-view-of-a-tropical-beach-5635/1080p.mp4"
-            type="video/mp4"
+        {kind === "iframe" && src ? (
+          <iframe
+            key={src}
+            src={src}
+            title="Elite Travel XP hero"
+            className="pointer-events-none absolute left-1/2 top-1/2 h-[56.25vw] min-h-full w-[177.78vh] min-w-full -translate-x-1/2 -translate-y-1/2 scale-105 border-0 blur-[1px]"
+            style={
+              isMobile
+                ? {
+                    width: "100%",
+                    height: "100%",
+                    minWidth: "100%",
+                    minHeight: "100%",
+                    transform: "translate(-50%, -50%) scale(1.08)",
+                  }
+                : undefined
+            }
+            allow="autoplay; fullscreen; picture-in-picture"
+            allowFullScreen
           />
-        </video>
+        ) : (
+          <video
+            key={src || "fallback"}
+            className="h-full w-full scale-105 object-cover blur-[1.5px]"
+            autoPlay
+            muted
+            loop
+            playsInline
+            poster={poster}
+            src={src || undefined}
+          >
+            {!src && (
+              <source
+                src="https://cdn.coverr.co/videos/coverr-aerial-view-of-a-tropical-beach-5635/1080p.mp4"
+                type="video/mp4"
+              />
+            )}
+          </video>
+        )}
         {/* eslint-disable-next-line @next/next/no-img-element */}
         <img
-          src="https://images.unsplash.com/photo-1488646953014-85cb44e25828?w=1920&q=80"
+          src={poster}
           alt=""
           className="absolute inset-0 -z-10 h-full w-full object-cover"
           aria-hidden

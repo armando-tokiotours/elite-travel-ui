@@ -1,22 +1,37 @@
+/**
+ * Headless WordPress client for Elite Travel XP.
+ *
+ * Uses `NEXT_PUBLIC_WORDPRESS_API` on the server and the `/blog/*` rewrite
+ * in the browser to avoid CORS. Falls back to editorial placeholders when
+ * the API is unreachable.
+ */
+
 import { decodeEntities, estimateReadingTime, stripHtml } from "@/lib/utils";
+import type { WpVimeoMeta } from "@/lib/videoConfig";
+import { WP_VIMEO_META_KEYS } from "@/lib/videoConfig";
+import type {
+  CityCategory,
+  ContinentId,
+  CountryCategory,
+  Destination,
+  DestinationId,
+  FetchPostsOptions,
+  FieldNote,
+  WPPost,
+  WPTerm,
+} from "@/types/wordpress";
 
-export type DestinationId =
-  | "spain"
-  | "greece"
-  | "thailand"
-  | "vietnam"
-  | "japan";
-
-export type ContinentId = "europe" | "asia";
-
-export interface Destination {
-  id: DestinationId;
-  name: string;
-  continent: ContinentId;
-  /** Approximate SVG pin position within the map viewBox */
-  x: number;
-  y: number;
-}
+export type {
+  CityCategory,
+  ContinentId,
+  CountryCategory,
+  Destination,
+  DestinationId,
+  FetchPostsOptions,
+  FieldNote,
+  WPPost,
+  WPTerm,
+} from "@/types/wordpress";
 
 export const DESTINATIONS: Destination[] = [
   { id: "spain", name: "Spain", continent: "europe", x: 312, y: 268 },
@@ -26,55 +41,6 @@ export const DESTINATIONS: Destination[] = [
   { id: "japan", name: "Japan", continent: "asia", x: 812, y: 248 },
 ];
 
-export interface WPRendered {
-  rendered: string;
-}
-
-export interface WPTerm {
-  id: number;
-  name: string;
-  slug: string;
-  taxonomy: string;
-}
-
-export interface WPEmbedded {
-  "wp:featuredmedia"?: Array<{
-    source_url?: string;
-    alt_text?: string;
-    media_details?: {
-      sizes?: Record<string, { source_url?: string }>;
-    };
-  }>;
-  "wp:term"?: WPTerm[][];
-}
-
-export interface WPPost {
-  id: number;
-  date: string;
-  slug: string;
-  link: string;
-  title: WPRendered;
-  content: WPRendered;
-  excerpt: WPRendered;
-  _embedded?: WPEmbedded;
-}
-
-export interface FieldNote {
-  id: number;
-  slug: string;
-  title: string;
-  excerpt: string;
-  content: string;
-  date: string;
-  imageUrl: string | null;
-  imageAlt: string;
-  categories: string[];
-  tags: string[];
-  readingMinutes: number;
-  destinations: DestinationId[];
-  continents: ContinentId[];
-}
-
 const DESTINATION_ALIASES: Record<DestinationId, string[]> = {
   spain: ["spain", "madrid", "barcelona", "andalucia", "seville", "europe"],
   greece: ["greece", "athens", "santorini", "mykonos", "crete", "europe"],
@@ -83,6 +49,23 @@ const DESTINATION_ALIASES: Record<DestinationId, string[]> = {
   japan: ["japan", "tokyo", "kyoto", "osaka", "okinawa", "asia"],
 };
 
+const EUROPE_SLUGS = new Set([
+  "spain",
+  "greece",
+  "europe",
+  "italy",
+  "france",
+  "portugal",
+]);
+const ASIA_SLUGS = new Set([
+  "japan",
+  "thailand",
+  "vietnam",
+  "asia",
+  "indonesia",
+  "korea",
+]);
+
 function matchDestinations(haystack: string): DestinationId[] {
   const normalized = haystack.toLowerCase();
   return (Object.keys(DESTINATION_ALIASES) as DestinationId[]).filter((id) =>
@@ -90,18 +73,55 @@ function matchDestinations(haystack: string): DestinationId[] {
   );
 }
 
+function inferContinent(slug: string, name: string): ContinentId | undefined {
+  const key = `${slug} ${name}`.toLowerCase();
+  if ([...EUROPE_SLUGS].some((s) => key.includes(s))) return "europe";
+  if ([...ASIA_SLUGS].some((s) => key.includes(s))) return "asia";
+  return undefined;
+}
+
+/** Extract Vimeo ACF / meta fields from a post or term. */
+export function extractVimeoMeta(
+  source?: {
+    acf?: Record<string, unknown> | null;
+    meta?: Record<string, unknown> | null;
+  } | null,
+): WpVimeoMeta {
+  const bag = {
+    ...(source?.meta ?? {}),
+    ...(source?.acf ?? {}),
+  } as Record<string, unknown>;
+
+  const desktop = bag[WP_VIMEO_META_KEYS.desktop];
+  const mobile = bag[WP_VIMEO_META_KEYS.mobile];
+
+  return {
+    vimeo_url_desktop:
+      typeof desktop === "string" && desktop.trim() ? desktop.trim() : null,
+    vimeo_url_mobile:
+      typeof mobile === "string" && mobile.trim() ? mobile.trim() : null,
+  };
+}
+
 export function mapWPPost(post: WPPost): FieldNote {
   const media = post._embedded?.["wp:featuredmedia"]?.[0];
   const terms = post._embedded?.["wp:term"]?.flat() ?? [];
-  const categories = terms
-    .filter((t) => t.taxonomy === "category")
-    .map((t) => t.name);
+  const categoryTerms = terms.filter((t) => t.taxonomy === "category");
+  const categories = categoryTerms.map((t) => t.name);
+  const categorySlugs = categoryTerms.map((t) => t.slug);
   const tags = terms.filter((t) => t.taxonomy === "post_tag").map((t) => t.name);
 
   const title = decodeEntities(stripHtml(post.title.rendered));
   const excerpt = decodeEntities(stripHtml(post.excerpt.rendered));
   const content = post.content.rendered;
-  const haystack = [title, excerpt, ...categories, ...tags, content].join(" ");
+  const haystack = [
+    title,
+    excerpt,
+    ...categories,
+    ...categorySlugs,
+    ...tags,
+    content,
+  ].join(" ");
   const destinations = matchDestinations(haystack);
   const continents = Array.from(
     new Set(
@@ -124,18 +144,101 @@ export function mapWPPost(post: WPPost): FieldNote {
       null,
     imageAlt: media?.alt_text || title,
     categories,
+    categorySlugs,
     tags,
     readingMinutes: estimateReadingTime(content),
     destinations,
     continents,
+    vimeo: extractVimeoMeta(post),
+  };
+}
+
+function mapCountryCategory(term: WPTerm): CountryCategory {
+  return {
+    id: term.id,
+    name: term.name,
+    slug: term.slug,
+    description: term.description ?? "",
+    continent: inferContinent(term.slug, term.name),
+    parentId: term.parent ?? 0,
+    count: term.count ?? 0,
+    vimeo: extractVimeoMeta(term),
+  };
+}
+
+function mapCityCategory(term: WPTerm, country?: CountryCategory): CityCategory {
+  return {
+    id: term.id,
+    name: term.name,
+    slug: term.slug,
+    description: term.description ?? "",
+    countryId: term.parent ?? country?.id ?? 0,
+    countrySlug: country?.slug,
+    count: term.count ?? 0,
+    vimeo: extractVimeoMeta(term),
   };
 }
 
 export function getWordpressApiBase(): string {
   return (
     process.env.NEXT_PUBLIC_WORDPRESS_API?.replace(/\/$/, "") ||
-    "https://your-wordpress-site.com/wp-json/wp/v2"
+    "https://tokiotours.jp/blog/wp-json/wp/v2"
   );
+}
+
+function isPlaceholderApi(api: string): boolean {
+  return api.includes("your-wordpress-site.com");
+}
+
+/** Prefer same-origin rewrite in the browser to avoid CORS. */
+function resolveEndpoint(path: string): string {
+  const api = getWordpressApiBase();
+  const clean = path.replace(/^\//, "");
+  if (typeof window !== "undefined" && !isPlaceholderApi(api)) {
+    return `/blog/${clean}`;
+  }
+  return `${api}/${clean}`;
+}
+
+async function wpFetch<T>(
+  path: string,
+  params?: Record<string, string>,
+): Promise<T | null> {
+  const api = getWordpressApiBase();
+  if (isPlaceholderApi(api) && typeof window === "undefined") {
+    return null;
+  }
+
+  const url = new URL(
+    resolveEndpoint(path),
+    typeof window === "undefined" ? "http://localhost" : window.location.origin,
+  );
+  if (params) {
+    Object.entries(params).forEach(([key, value]) => {
+      if (value) url.searchParams.set(key, value);
+    });
+  }
+
+  const controller = new AbortController();
+  const timeout = setTimeout(() => controller.abort(), 8000);
+
+  try {
+    const href =
+      typeof window === "undefined" && url.hostname === "localhost"
+        ? `${getWordpressApiBase().replace(/\/$/, "")}/${path.replace(/^\//, "")}?${url.searchParams.toString()}`
+        : url.toString();
+
+    const res = await fetch(href, {
+      next: { revalidate: 60 },
+      signal: controller.signal,
+    });
+    if (!res.ok) return null;
+    return (await res.json()) as T;
+  } catch {
+    return null;
+  } finally {
+    clearTimeout(timeout);
+  }
 }
 
 function filterNotesBySearch(notes: FieldNote[], search?: string): FieldNote[] {
@@ -146,6 +249,7 @@ function filterNotesBySearch(notes: FieldNote[], search?: string): FieldNote[] {
       note.title,
       note.excerpt,
       ...note.categories,
+      ...note.categorySlugs,
       ...note.tags,
       ...note.destinations,
     ]
@@ -155,53 +259,140 @@ function filterNotesBySearch(notes: FieldNote[], search?: string): FieldNote[] {
   });
 }
 
-export async function fetchPosts(options?: {
-  search?: string;
-  perPage?: number;
-}): Promise<FieldNote[]> {
-  const api = getWordpressApiBase();
-  const isPlaceholder = api.includes("your-wordpress-site.com");
-
-  // Browser uses same-origin rewrite; server hits WP directly.
-  const base =
-    typeof window !== "undefined" && !isPlaceholder
-      ? "/blog/posts"
-      : `${api}/posts`;
-
-  if (isPlaceholder && typeof window === "undefined") {
-    return filterNotesBySearch(getFallbackNotes(), options?.search);
-  }
-
-  const params = new URLSearchParams({
-    _embed: "1",
-    per_page: String(options?.perPage ?? 24),
-  });
-  if (options?.search?.trim()) {
-    params.set("search", options.search.trim());
-  }
-
-  try {
-    const controller = new AbortController();
-    const timeout = setTimeout(() => controller.abort(), 8000);
-    const res = await fetch(`${base}?${params.toString()}`, {
-      next: { revalidate: 60 },
-      signal: controller.signal,
-    });
-    clearTimeout(timeout);
-
-    if (!res.ok) {
-      return filterNotesBySearch(getFallbackNotes(), options?.search);
-    }
-    const data = (await res.json()) as WPPost[];
-    if (!Array.isArray(data) || data.length === 0) {
-      return filterNotesBySearch(getFallbackNotes(), options?.search);
-    }
-    return data.map(mapWPPost);
-  } catch {
-    return filterNotesBySearch(getFallbackNotes(), options?.search);
-  }
+function filterNotesBySlug(notes: FieldNote[], slug: string): FieldNote[] {
+  const key = slug.trim().toLowerCase();
+  if (!key) return notes;
+  return notes.filter(
+    (note) =>
+      note.categorySlugs.some((s) => s.toLowerCase() === key) ||
+      note.categories.some((c) => c.toLowerCase() === key) ||
+      note.destinations.includes(key as DestinationId) ||
+      note.slug.toLowerCase().includes(key),
+  );
 }
 
+/**
+ * Look up a WordPress category by slug (`/categories?slug=`).
+ */
+export async function fetchCategoryBySlug(
+  slug: string,
+): Promise<WPTerm | null> {
+  if (!slug.trim()) return null;
+  const data = await wpFetch<WPTerm[]>("categories", {
+    slug: slug.trim(),
+    per_page: "1",
+  });
+  return data?.[0] ?? null;
+}
+
+/**
+ * Fetch a Country category (top-level or known destination slug)
+ * including optional Vimeo ACF fields.
+ */
+export async function fetchCountryBySlug(
+  slug: string,
+): Promise<CountryCategory | null> {
+  const term = await fetchCategoryBySlug(slug);
+  if (!term) return null;
+  return mapCountryCategory(term);
+}
+
+/**
+ * Fetch a City category by slug. When `countrySlug` is provided,
+ * verifies the city belongs under that country parent.
+ */
+export async function fetchCityBySlug(
+  slug: string,
+  countrySlug?: string,
+): Promise<CityCategory | null> {
+  const term = await fetchCategoryBySlug(slug);
+  if (!term) return null;
+
+  let country: CountryCategory | undefined;
+  if (countrySlug) {
+    country = (await fetchCountryBySlug(countrySlug)) ?? undefined;
+    if (country && term.parent && term.parent !== country.id) {
+      return null;
+    }
+  } else if (term.parent) {
+    const parent = await wpFetch<WPTerm>(`categories/${term.parent}`);
+    if (parent) country = mapCountryCategory(parent);
+  }
+
+  return mapCityCategory(term, country);
+}
+
+/**
+ * Core posts fetcher with search, category ID, and slug filters.
+ */
+export async function fetchPosts(
+  options: FetchPostsOptions = {},
+): Promise<FieldNote[]> {
+  const params: Record<string, string> = {
+    _embed: "1",
+    per_page: String(options.perPage ?? 24),
+  };
+
+  if (options.search?.trim()) {
+    params.search = options.search.trim();
+  }
+
+  let categoryId: number | undefined;
+  const slug =
+    options.citySlug?.trim() ||
+    options.countrySlug?.trim() ||
+    options.categorySlug?.trim();
+
+  if (options.categories) {
+    const ids = Array.isArray(options.categories)
+      ? options.categories
+      : [options.categories];
+    params.categories = ids.join(",");
+  } else if (slug) {
+    const term = await fetchCategoryBySlug(slug);
+    if (term) {
+      categoryId = term.id;
+      params.categories = String(term.id);
+    }
+  }
+
+  const data = await wpFetch<WPPost[]>("posts", params);
+
+  if (!data || !Array.isArray(data) || data.length === 0) {
+    let fallback = getFallbackNotes();
+    if (options.search) fallback = filterNotesBySearch(fallback, options.search);
+    if (slug) fallback = filterNotesBySlug(fallback, slug);
+    return fallback;
+  }
+
+  let notes = data.map(mapWPPost);
+
+  // Client-side reinforce when WP category filter was unavailable.
+  if (slug && !categoryId) {
+    notes = filterNotesBySlug(notes, slug);
+  }
+
+  return notes;
+}
+
+/** Fetch Field Notes tagged under a Country category slug. */
+export async function fetchPostsByCountry(
+  countrySlug: string,
+  perPage = 24,
+): Promise<FieldNote[]> {
+  return fetchPosts({ countrySlug, perPage });
+}
+
+/** Fetch Field Notes tagged under a City category slug. */
+export async function fetchPostsByCity(
+  citySlug: string,
+  countrySlug?: string,
+  perPage = 24,
+): Promise<FieldNote[]> {
+  return fetchPosts({ citySlug, countrySlug, perPage });
+}
+
+/** Live search against `/posts?search=KEYWORD`. */
 export async function searchPosts(query: string): Promise<FieldNote[]> {
   if (!query.trim()) return [];
   return fetchPosts({ search: query, perPage: 12 });
@@ -209,9 +400,12 @@ export async function searchPosts(query: string): Promise<FieldNote[]> {
 
 /** Editorial placeholders used when WordPress is unreachable. */
 export function getFallbackNotes(): FieldNote[] {
-  const samples: Array<Omit<FieldNote, "destinations" | "continents"> & {
-    destinations: DestinationId[];
-  }> = [
+  const samples: Array<
+    Omit<FieldNote, "destinations" | "continents" | "vimeo" | "categorySlugs"> & {
+      destinations: DestinationId[];
+      categorySlugs: string[];
+    }
+  > = [
     {
       id: 1,
       slug: "kyoto-tea-house-dawn",
@@ -224,6 +418,7 @@ export function getFallbackNotes(): FieldNote[] {
         "https://images.unsplash.com/photo-1493976040374-85c8e12f0c0e?w=1600&q=80",
       imageAlt: "Kyoto temple path",
       categories: ["Japan"],
+      categorySlugs: ["japan", "kyoto"],
       tags: ["Kyoto", "Ryokan"],
       readingMinutes: 4,
       destinations: ["japan"],
@@ -240,6 +435,7 @@ export function getFallbackNotes(): FieldNote[] {
         "https://images.unsplash.com/photo-1613395877344-13d4a8e0d49e?w=1600&q=80",
       imageAlt: "Santorini at dusk",
       categories: ["Greece"],
+      categorySlugs: ["greece", "santorini"],
       tags: ["Santorini", "Aegean"],
       readingMinutes: 3,
       destinations: ["greece"],
@@ -256,6 +452,7 @@ export function getFallbackNotes(): FieldNote[] {
         "https://images.unsplash.com/photo-1528183429752-a97d0bf99b5a?w=1600&q=80",
       imageAlt: "Thai temple",
       categories: ["Thailand"],
+      categorySlugs: ["thailand", "chiang-mai"],
       tags: ["Chiang Mai"],
       readingMinutes: 5,
       destinations: ["thailand"],
@@ -272,6 +469,7 @@ export function getFallbackNotes(): FieldNote[] {
         "https://images.unsplash.com/photo-1583422409516-2895a77efded?w=1600&q=80",
       imageAlt: "Barcelona street",
       categories: ["Spain"],
+      categorySlugs: ["spain", "barcelona"],
       tags: ["Barcelona"],
       readingMinutes: 3,
       destinations: ["spain"],
@@ -288,6 +486,7 @@ export function getFallbackNotes(): FieldNote[] {
         "https://images.unsplash.com/photo-1559592413-7cec4d0cae2b?w=1600&q=80",
       imageAlt: "Hanoi street",
       categories: ["Vietnam"],
+      categorySlugs: ["vietnam", "hanoi"],
       tags: ["Hanoi"],
       readingMinutes: 4,
       destinations: ["vietnam"],
@@ -304,6 +503,7 @@ export function getFallbackNotes(): FieldNote[] {
         "https://images.unsplash.com/photo-1555993539-1732b0258235?w=1600&q=80",
       imageAlt: "Acropolis",
       categories: ["Greece"],
+      categorySlugs: ["greece", "athens"],
       tags: ["Athens"],
       readingMinutes: 3,
       destinations: ["greece"],
@@ -312,6 +512,7 @@ export function getFallbackNotes(): FieldNote[] {
 
   return samples.map((note) => ({
     ...note,
+    vimeo: { vimeo_url_desktop: null, vimeo_url_mobile: null },
     continents: Array.from(
       new Set(
         note.destinations.map(
