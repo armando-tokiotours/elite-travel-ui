@@ -266,9 +266,11 @@ function defaultCountrySlot(): VideoSlot {
     id: "country-default",
     label: "Default Country Background Video",
     desktop:
+      env("NEXT_PUBLIC_VIMEO_COUNTRY_DESKTOP") ||
       env("NEXT_PUBLIC_VIMEO_HERO_DESKTOP") ||
       env("NEXT_PUBLIC_VIMEO_EUROPE_DESKTOP"),
     mobile:
+      env("NEXT_PUBLIC_VIMEO_COUNTRY_MOBILE") ||
       env("NEXT_PUBLIC_VIMEO_HERO_MOBILE") ||
       env("NEXT_PUBLIC_VIMEO_EUROPE_MOBILE"),
   };
