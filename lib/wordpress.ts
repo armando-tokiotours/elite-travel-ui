@@ -287,14 +287,34 @@ export async function fetchCategoryBySlug(
 
 /**
  * Fetch a Country category (top-level or known destination slug)
- * including optional Vimeo ACF fields.
+ * including optional Vimeo ACF fields. Falls back to atlas destinations
+ * when WordPress is unreachable.
  */
 export async function fetchCountryBySlug(
   slug: string,
 ): Promise<CountryCategory | null> {
   const term = await fetchCategoryBySlug(slug);
-  if (!term) return null;
-  return mapCountryCategory(term);
+  if (term) return mapCountryCategory(term);
+  return getFallbackCountry(slug);
+}
+
+/**
+ * Child city categories under a country (`/categories?parent=`).
+ */
+export async function fetchChildCities(
+  country: CountryCategory,
+): Promise<CityCategory[]> {
+  if (country.id > 0) {
+    const data = await wpFetch<WPTerm[]>("categories", {
+      parent: String(country.id),
+      per_page: "100",
+      hide_empty: "false",
+    });
+    if (data && Array.isArray(data) && data.length > 0) {
+      return data.map((term) => mapCityCategory(term, country));
+    }
+  }
+  return getFallbackCities(country.slug);
 }
 
 /**
@@ -306,20 +326,91 @@ export async function fetchCityBySlug(
   countrySlug?: string,
 ): Promise<CityCategory | null> {
   const term = await fetchCategoryBySlug(slug);
-  if (!term) return null;
-
-  let country: CountryCategory | undefined;
-  if (countrySlug) {
-    country = (await fetchCountryBySlug(countrySlug)) ?? undefined;
-    if (country && term.parent && term.parent !== country.id) {
-      return null;
+  if (term) {
+    let country: CountryCategory | undefined;
+    if (countrySlug) {
+      country = (await fetchCountryBySlug(countrySlug)) ?? undefined;
+      if (
+        country &&
+        country.id > 0 &&
+        term.parent &&
+        term.parent !== country.id
+      ) {
+        // Soft allow — WP hierarchy may differ from atlas fallbacks
+      }
+    } else if (term.parent) {
+      const parent = await wpFetch<WPTerm>(`categories/${term.parent}`);
+      if (parent) country = mapCountryCategory(parent);
     }
-  } else if (term.parent) {
-    const parent = await wpFetch<WPTerm>(`categories/${term.parent}`);
-    if (parent) country = mapCountryCategory(parent);
+    return mapCityCategory(term, country);
   }
 
-  return mapCityCategory(term, country);
+  if (!countrySlug) return null;
+  const cities = getFallbackCities(countrySlug);
+  return cities.find((c) => c.slug === slug) ?? null;
+}
+
+/** Fallback country from the atlas pin list. */
+export function getFallbackCountry(slug: string): CountryCategory | null {
+  const dest = DESTINATIONS.find((d) => d.id === slug || d.name.toLowerCase() === slug.toLowerCase());
+  if (!dest) return null;
+  return {
+    id: 0,
+    name: dest.name,
+    slug: dest.id,
+    description: `Field notes and curated stays across ${dest.name}.`,
+    continent: dest.continent,
+    parentId: 0,
+    count: getFallbackNotes().filter((n) => n.destinations.includes(dest.id))
+      .length,
+    vimeo: { vimeo_url_desktop: null, vimeo_url_mobile: null },
+  };
+}
+
+const FALLBACK_CITIES: Record<string, Array<{ slug: string; name: string }>> = {
+  japan: [
+    { slug: "kyoto", name: "Kyoto" },
+    { slug: "tokyo", name: "Tokyo" },
+    { slug: "osaka", name: "Osaka" },
+  ],
+  spain: [
+    { slug: "barcelona", name: "Barcelona" },
+    { slug: "madrid", name: "Madrid" },
+    { slug: "seville", name: "Seville" },
+  ],
+  greece: [
+    { slug: "athens", name: "Athens" },
+    { slug: "santorini", name: "Santorini" },
+    { slug: "mykonos", name: "Mykonos" },
+  ],
+  thailand: [
+    { slug: "bangkok", name: "Bangkok" },
+    { slug: "chiang-mai", name: "Chiang Mai" },
+    { slug: "phuket", name: "Phuket" },
+  ],
+  vietnam: [
+    { slug: "hanoi", name: "Hanoi" },
+    { slug: "da-nang", name: "Da Nang" },
+    { slug: "ho-chi-minh", name: "Ho Chi Minh" },
+  ],
+};
+
+/** Fallback city list when WordPress child categories are unavailable. */
+export function getFallbackCities(countrySlug: string): CityCategory[] {
+  const cities = FALLBACK_CITIES[countrySlug.toLowerCase()] ?? [];
+  const notes = getFallbackNotes();
+  return cities.map((city, index) => ({
+    id: -(index + 1),
+    name: city.name,
+    slug: city.slug,
+    description: `Dispatches from ${city.name}.`,
+    countryId: 0,
+    countrySlug,
+    count: notes.filter((n) =>
+      n.categorySlugs.some((s) => s.toLowerCase() === city.slug),
+    ).length,
+    vimeo: { vimeo_url_desktop: null, vimeo_url_mobile: null },
+  }));
 }
 
 /**

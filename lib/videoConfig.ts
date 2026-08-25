@@ -301,6 +301,18 @@ export const VIDEO_SLOTS = {
   countryDefault: defaultCountrySlot(),
 } as const satisfies Record<string, VideoSlot>;
 
+/**
+ * Alias used by destination hubs (Phase 2).
+ * Prefer `VIDEO_SLOTS` in new code; `VIMEO_VIDEOS.defaultCountry` maps to
+ * `VIDEO_SLOTS.countryDefault`.
+ */
+export const VIMEO_VIDEOS = {
+  hero: VIDEO_SLOTS.hero,
+  asia: VIDEO_SLOTS.asia,
+  europe: VIDEO_SLOTS.europe,
+  defaultCountry: VIDEO_SLOTS.countryDefault,
+} as const;
+
 export type VideoSlotKey = keyof typeof VIDEO_SLOTS;
 
 /** Resolve a regional transition slot (`asia` | `europe`) or fall back to hero. */

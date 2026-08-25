@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useRef } from "react";
+import Link from "next/link";
 import gsap from "gsap";
 import {
   DESTINATIONS,
@@ -97,6 +98,15 @@ export function InteractiveMap({ filter, onFilterChange }: InteractiveMapProps) 
           >
             Asia
           </MapChip>
+          {filter.type === "destination" && (
+            <Link
+              href={`/destinations/${filter.id}`}
+              className="border border-champagne/50 bg-champagne/10 px-4 py-2 text-[11px] tracking-[0.22em] text-champagne uppercase transition hover:bg-champagne/20"
+            >
+              Enter{" "}
+              {DESTINATIONS.find((d) => d.id === filter.id)?.name ?? filter.id}
+            </Link>
+          )}
         </div>
       </div>
 
