@@ -24,7 +24,7 @@ export function DestinationHero({
   meta,
   breadcrumb,
 }: DestinationHeroProps) {
-  const { kind, src, isMobile } = useResponsiveVideo(
+  const { kind, src, ready } = useResponsiveVideo(
     VIMEO_VIDEOS.defaultCountry,
     { meta },
   );
@@ -34,42 +34,31 @@ export function DestinationHero({
   return (
     <section className="relative flex min-h-[70svh] items-end overflow-hidden md:min-h-[78svh]">
       <div className="absolute inset-0">
-        {kind === "iframe" && src ? (
+        {ready && kind === "iframe" && src ? (
           <iframe
             key={src}
             src={src}
             title={`${title} atmosphere`}
-            className="pointer-events-none absolute left-1/2 top-1/2 h-[56.25vw] min-h-full w-[177.78vh] min-w-full -translate-x-1/2 -translate-y-1/2 scale-105 border-0 blur-[1px]"
-            style={
-              isMobile
-                ? {
-                    width: "100%",
-                    height: "100%",
-                    minWidth: "100%",
-                    minHeight: "100%",
-                    transform: "translate(-50%, -50%) scale(1.08)",
-                  }
-                : undefined
-            }
+            className="pointer-events-none absolute left-1/2 top-1/2 h-[56.25vw] min-h-full w-[177.78vh] min-w-full -translate-x-1/2 -translate-y-1/2 scale-105 border-0 blur-[1px] max-md:h-full max-md:w-full max-md:min-h-full max-md:min-w-full max-md:scale-110"
             allow="autoplay; fullscreen; picture-in-picture"
           />
-        ) : (
+        ) : ready && kind === "file" && src ? (
           <video
-            key={src || "fallback"}
+            key={src}
             className="h-full w-full scale-105 object-cover blur-[1px]"
             autoPlay
             muted
             loop
             playsInline
             poster={poster}
-            src={src || undefined}
+            src={src}
           />
-        )}
+        ) : null}
         {/* eslint-disable-next-line @next/next/no-img-element */}
         <img
           src={poster}
           alt=""
-          className="absolute inset-0 -z-10 h-full w-full object-cover"
+          className="absolute inset-0 h-full w-full object-cover"
           aria-hidden
         />
         <div className="hero-vignette absolute inset-0" />

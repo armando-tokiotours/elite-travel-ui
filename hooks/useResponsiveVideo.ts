@@ -44,7 +44,10 @@ export interface UseResponsiveVideoResult {
   embedUrl: string;
   /** Resolved slot after WordPress meta overrides. */
   slot: VideoSlot;
-  /** False until the first client-side measurement runs (SSR-safe). */
+  /**
+   * False until after mount + first viewport measurement.
+   * Keep SSR/hydration markup identical (poster only) until this is true.
+   */
   ready: boolean;
 }
 
@@ -62,6 +65,7 @@ export function useResponsiveVideo(
 ): UseResponsiveVideoResult {
   const { meta = null, background = true } = options;
 
+  // Always start false on server + first client paint to avoid hydration mismatch.
   const [isMobile, setIsMobile] = useState(false);
   const [ready, setReady] = useState(false);
 
@@ -102,9 +106,9 @@ export function useResponsiveVideo(
     aspect,
     isMobile,
     source,
-    kind: playback.kind,
-    src: playback.src,
-    embedUrl: playback.kind === "iframe" ? playback.src : "",
+    kind: ready ? playback.kind : "none",
+    src: ready ? playback.src : "",
+    embedUrl: ready && playback.kind === "iframe" ? playback.src : "",
     slot,
     ready,
   };

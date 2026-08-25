@@ -79,58 +79,40 @@ export function HomeExperience({ notes }: HomeExperienceProps) {
 }
 
 function Hero() {
-  const { kind, src, isMobile } = useResponsiveVideo(VIDEO_SLOTS.hero);
+  const { kind, src, ready } = useResponsiveVideo(VIDEO_SLOTS.hero);
   const poster =
     "https://images.unsplash.com/photo-1488646953014-85cb44e25828?w=1920&q=80";
 
   return (
     <section className="relative flex min-h-[100svh] items-end overflow-hidden">
-      {/* Full-bleed responsive video — MP4 file or iframe provider */}
+      {/* Full-bleed responsive video — mounts after hydration to avoid SSR mismatch */}
       <div className="absolute inset-0">
-        {kind === "iframe" && src ? (
+        {ready && kind === "iframe" && src ? (
           <iframe
             key={src}
             src={src}
             title="Elite Travel XP hero"
-            className="pointer-events-none absolute left-1/2 top-1/2 h-[56.25vw] min-h-full w-[177.78vh] min-w-full -translate-x-1/2 -translate-y-1/2 scale-105 border-0 blur-[1px]"
-            style={
-              isMobile
-                ? {
-                    width: "100%",
-                    height: "100%",
-                    minWidth: "100%",
-                    minHeight: "100%",
-                    transform: "translate(-50%, -50%) scale(1.08)",
-                  }
-                : undefined
-            }
+            className="pointer-events-none absolute left-1/2 top-1/2 h-[56.25vw] min-h-full w-[177.78vh] min-w-full -translate-x-1/2 -translate-y-1/2 scale-105 border-0 blur-[1px] max-md:h-full max-md:w-full max-md:min-h-full max-md:min-w-full max-md:scale-110"
             allow="autoplay; fullscreen; picture-in-picture"
             allowFullScreen
           />
-        ) : (
+        ) : ready && kind === "file" && src ? (
           <video
-            key={src || "fallback"}
+            key={src}
             className="h-full w-full scale-105 object-cover blur-[1.5px]"
             autoPlay
             muted
             loop
             playsInline
             poster={poster}
-            src={src || undefined}
-          >
-            {!src && (
-              <source
-                src="https://cdn.coverr.co/videos/coverr-aerial-view-of-a-tropical-beach-5635/1080p.mp4"
-                type="video/mp4"
-              />
-            )}
-          </video>
-        )}
+            src={src}
+          />
+        ) : null}
         {/* eslint-disable-next-line @next/next/no-img-element */}
         <img
           src={poster}
           alt=""
-          className="absolute inset-0 -z-10 h-full w-full object-cover"
+          className="absolute inset-0 h-full w-full object-cover"
           aria-hidden
         />
         <div className="hero-vignette absolute inset-0" />

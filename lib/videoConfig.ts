@@ -47,9 +47,21 @@ export type WpVideoMeta = {
 /** @deprecated Prefer `WpVideoMeta`. */
 export type WpVimeoMeta = WpVideoMeta;
 
-function env(key: string): string {
-  return (process.env[key] ?? "").trim();
+/** Static env reads — Next.js only inlines literal `process.env.NEXT_PUBLIC_*` keys. */
+function readPublicEnv(value: string | undefined): string {
+  return (value ?? "").trim();
 }
+
+const ENV_VIDEOS = {
+  heroDesktop: readPublicEnv(process.env.NEXT_PUBLIC_VIMEO_HERO_DESKTOP),
+  heroMobile: readPublicEnv(process.env.NEXT_PUBLIC_VIMEO_HERO_MOBILE),
+  asiaDesktop: readPublicEnv(process.env.NEXT_PUBLIC_VIMEO_ASIA_DESKTOP),
+  asiaMobile: readPublicEnv(process.env.NEXT_PUBLIC_VIMEO_ASIA_MOBILE),
+  europeDesktop: readPublicEnv(process.env.NEXT_PUBLIC_VIMEO_EUROPE_DESKTOP),
+  europeMobile: readPublicEnv(process.env.NEXT_PUBLIC_VIMEO_EUROPE_MOBILE),
+  countryDesktop: readPublicEnv(process.env.NEXT_PUBLIC_VIMEO_COUNTRY_DESKTOP),
+  countryMobile: readPublicEnv(process.env.NEXT_PUBLIC_VIMEO_COUNTRY_MOBILE),
+} as const;
 
 /** Pick desktop or mobile source from a slot. */
 export function pickSlotUrl(slot: VideoSlot, aspect: VideoAspect): string {
@@ -266,13 +278,13 @@ function defaultCountrySlot(): VideoSlot {
     id: "country-default",
     label: "Default Country Background Video",
     desktop:
-      env("NEXT_PUBLIC_VIMEO_COUNTRY_DESKTOP") ||
-      env("NEXT_PUBLIC_VIMEO_HERO_DESKTOP") ||
-      env("NEXT_PUBLIC_VIMEO_EUROPE_DESKTOP"),
+      ENV_VIDEOS.countryDesktop ||
+      ENV_VIDEOS.heroDesktop ||
+      ENV_VIDEOS.europeDesktop,
     mobile:
-      env("NEXT_PUBLIC_VIMEO_COUNTRY_MOBILE") ||
-      env("NEXT_PUBLIC_VIMEO_HERO_MOBILE") ||
-      env("NEXT_PUBLIC_VIMEO_EUROPE_MOBILE"),
+      ENV_VIDEOS.countryMobile ||
+      ENV_VIDEOS.heroMobile ||
+      ENV_VIDEOS.europeMobile,
   };
 }
 
@@ -285,20 +297,20 @@ export const VIDEO_SLOTS = {
   hero: {
     id: "hero",
     label: "Hero Landing Video",
-    desktop: env("NEXT_PUBLIC_VIMEO_HERO_DESKTOP"),
-    mobile: env("NEXT_PUBLIC_VIMEO_HERO_MOBILE"),
+    desktop: ENV_VIDEOS.heroDesktop,
+    mobile: ENV_VIDEOS.heroMobile,
   },
   asia: {
     id: "asia",
     label: "Asia Region Transition Video",
-    desktop: env("NEXT_PUBLIC_VIMEO_ASIA_DESKTOP"),
-    mobile: env("NEXT_PUBLIC_VIMEO_ASIA_MOBILE"),
+    desktop: ENV_VIDEOS.asiaDesktop,
+    mobile: ENV_VIDEOS.asiaMobile,
   },
   europe: {
     id: "europe",
     label: "Europe Region Transition Video",
-    desktop: env("NEXT_PUBLIC_VIMEO_EUROPE_DESKTOP"),
-    mobile: env("NEXT_PUBLIC_VIMEO_EUROPE_MOBILE"),
+    desktop: ENV_VIDEOS.europeDesktop,
+    mobile: ENV_VIDEOS.europeMobile,
   },
   countryDefault: defaultCountrySlot(),
 } as const satisfies Record<string, VideoSlot>;
