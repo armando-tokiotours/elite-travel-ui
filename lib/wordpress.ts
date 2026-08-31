@@ -1,11 +1,11 @@
 /**
  * Headless WordPress client for Elite Travel XP.
  *
- * Uses `NEXT_PUBLIC_WORDPRESS_API_URL` on the server and the `/blog/*` rewrite
- * in the browser to avoid CORS. Falls back to editorial placeholders when
- * the API is unreachable.
+ * Fetches content from blog.travelexperiencesgroup.com subdomain.
+ * Falls back to editorial placeholders when the API is unreachable.
  */
 
+import { WP_API_BASE } from "@/lib/domains";
 import { decodeEntities, estimateReadingTime, stripHtml } from "@/lib/utils";
 import type { WpVimeoMeta } from "@/lib/videoConfig";
 import { WP_VIMEO_META_KEYS } from "@/lib/videoConfig";
@@ -180,10 +180,7 @@ function mapCityCategory(term: WPTerm, country?: CountryCategory): CityCategory 
 }
 
 export function getWordpressApiBase(): string {
-  return (
-    process.env.NEXT_PUBLIC_WORDPRESS_API_URL?.replace(/\/$/, "") ||
-    "https://travelexperiencesgroup.com/blog/wp-json/wp/v2"
-  );
+  return WP_API_BASE;
 }
 
 function isPlaceholderApi(api: string): boolean {

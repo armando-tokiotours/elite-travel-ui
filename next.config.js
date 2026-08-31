@@ -16,6 +16,11 @@ const nextConfig = {
     remotePatterns: [
       {
         protocol: 'https',
+        hostname: 'blog.travelexperiencesgroup.com',
+        pathname: '/**',
+      },
+      {
+        protocol: 'https',
         hostname: 'travelexperiencesgroup.com',
         pathname: '/**',
       },
