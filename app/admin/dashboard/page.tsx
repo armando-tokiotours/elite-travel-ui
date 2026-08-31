@@ -6,7 +6,7 @@ import { DEFAULT_SITE_CONFIG, loadSiteConfig, saveSiteConfig, type SiteConfig } 
 export default function AdminDashboard() {
   const [config, setConfig] = useState<SiteConfig>(DEFAULT_SITE_CONFIG);
   const [saved, setSaved] = useState(false);
-  const [activeTab, setActiveTab] = useState<'navigation' | 'scrolls' | 'portals' | 'cards' | 'about'>('navigation');
+  const [activeTab, setActiveTab] = useState<'navigation' | 'scrolls' | 'portals' | 'cards' | 'team' | 'matrix' | 'themes' | 'about'>('navigation');
 
   useEffect(() => {
     setConfig(loadSiteConfig());
@@ -34,11 +34,21 @@ export default function AdminDashboard() {
     });
   };
 
-  const updateCard = (index: number, field: string, value: string) => {
+  const updateCard = (index: number, field: string, value: string | File) => {
     const updated = [...config.experienceCards];
     const card = updated[index] as any;
-    card[field] = value;
-    setConfig({ ...config, experienceCards: updated });
+
+    if (field === 'image' && value instanceof File) {
+      const reader = new FileReader();
+      reader.onload = (e) => {
+        card.image = e.target?.result as string;
+        setConfig({ ...config, experienceCards: updated });
+      };
+      reader.readAsDataURL(value);
+    } else {
+      card[field] = value;
+      setConfig({ ...config, experienceCards: updated });
+    }
   };
 
   const updateAbout = (field: string, value: string) => {
@@ -59,12 +69,12 @@ export default function AdminDashboard() {
         </div>
 
         {/* Tabs */}
-        <div className="flex gap-2 mb-8 border-b border-[#755F42]/30">
-          {(['navigation', 'scrolls', 'portals', 'cards', 'about'] as const).map(tab => (
+        <div className="flex gap-2 mb-8 border-b border-[#755F42]/30 overflow-x-auto pb-2">
+          {(['navigation', 'scrolls', 'portals', 'cards', 'team', 'matrix', 'themes', 'about'] as const).map(tab => (
             <button
               key={tab}
               onClick={() => setActiveTab(tab)}
-              className={`px-6 py-3 text-sm font-serif uppercase tracking-widest transition-colors ${
+              className={`px-6 py-3 text-sm font-serif uppercase tracking-widest transition-colors whitespace-nowrap ${
                 activeTab === tab
                   ? 'text-[#F9C56C] border-b-2 border-[#F9C56C]'
                   : 'text-[#E5E5E5]/60 hover:text-[#E5E5E5]'
@@ -74,7 +84,10 @@ export default function AdminDashboard() {
               {tab === 'scrolls' && 'Hero Scrolls'}
               {tab === 'portals' && 'Brand Portals'}
               {tab === 'cards' && 'Experience Cards'}
-              {tab === 'about' && 'About Section'}
+              {tab === 'team' && 'Team'}
+              {tab === 'matrix' && 'House Matrix'}
+              {tab === 'themes' && 'Themes'}
+              {tab === 'about' && 'About'}
             </button>
           ))}
         </div>
@@ -180,6 +193,28 @@ export default function AdminDashboard() {
               <h2 className="text-2xl font-serif text-[#F9C56C] mb-6">Edit Experience Cards</h2>
               {config.experienceCards.map((card, idx) => (
                 <div key={card.id} className="bg-[#0D0D0D] border border-[#755F42]/30 rounded-lg p-6 space-y-4">
+                  {/* Image Preview and Upload */}
+                  <div className="space-y-2">
+                    {card.image && (
+                      <div className="w-full h-32 rounded overflow-hidden border border-[#755F42]/30">
+                        <img src={card.image} alt={card.title} className="w-full h-full object-cover" />
+                      </div>
+                    )}
+                    <label className="block px-4 py-2 bg-[#F9C56C] text-[#1F1F1F] rounded cursor-pointer text-sm font-serif uppercase text-center hover:bg-[#E5C050] transition">
+                      Upload Photo
+                      <input
+                        type="file"
+                        accept="image/*"
+                        className="hidden"
+                        onChange={e => {
+                          const file = e.target.files?.[0];
+                          if (file) updateCard(idx, 'image', file);
+                        }}
+                      />
+                    </label>
+                  </div>
+
+                  {/* Text Fields */}
                   <div className="grid grid-cols-2 gap-4">
                     <input
                       type="text"
@@ -204,6 +239,164 @@ export default function AdminDashboard() {
                   />
                 </div>
               ))}
+            </div>
+          )}
+
+          {/* Team Tab */}
+          {activeTab === 'team' && (
+            <div className="space-y-6">
+              <h2 className="text-2xl font-serif text-[#F9C56C] mb-6">— OUR CONCIERGE TEAM —</h2>
+              <p className="text-[#E5E5E5]/70 mb-6">Add team member information, photos, and bios</p>
+
+              <div className="bg-[#0D0D0D] border border-[#755F42]/30 rounded-lg p-6 space-y-6">
+                <div className="space-y-4">
+                  <div>
+                    <label className="block text-sm font-serif text-[#F9C56C] mb-2">Team Member 1</label>
+                    <div className="space-y-2">
+                      <input type="text" placeholder="Name" className="w-full bg-[#1A1A1A] border border-[#755F42]/40 rounded px-4 py-2 text-[#E5E5E5]" />
+                      <input type="text" placeholder="Role" className="w-full bg-[#1A1A1A] border border-[#755F42]/40 rounded px-4 py-2 text-[#E5E5E5]" />
+                      <textarea placeholder="Bio" className="w-full bg-[#1A1A1A] border border-[#755F42]/40 rounded px-4 py-2 text-[#E5E5E5] h-16" />
+                      <label className="block px-4 py-2 bg-[#F9C56C] text-[#1F1F1F] rounded cursor-pointer text-sm font-serif text-center hover:bg-[#E5C050]">
+                        Upload Photo
+                        <input type="file" accept="image/*" className="hidden" />
+                      </label>
+                    </div>
+                  </div>
+                  <div className="border-t border-[#755F42]/30 pt-4">
+                    <label className="block text-sm font-serif text-[#F9C56C] mb-2">Team Member 2</label>
+                    <div className="space-y-2">
+                      <input type="text" placeholder="Name" className="w-full bg-[#1A1A1A] border border-[#755F42]/40 rounded px-4 py-2 text-[#E5E5E5]" />
+                      <input type="text" placeholder="Role" className="w-full bg-[#1A1A1A] border border-[#755F42]/40 rounded px-4 py-2 text-[#E5E5E5]" />
+                      <textarea placeholder="Bio" className="w-full bg-[#1A1A1A] border border-[#755F42]/40 rounded px-4 py-2 text-[#E5E5E5] h-16" />
+                      <label className="block px-4 py-2 bg-[#F9C56C] text-[#1F1F1F] rounded cursor-pointer text-sm font-serif text-center hover:bg-[#E5C050]">
+                        Upload Photo
+                        <input type="file" accept="image/*" className="hidden" />
+                      </label>
+                    </div>
+                  </div>
+                  <div className="border-t border-[#755F42]/30 pt-4">
+                    <label className="block text-sm font-serif text-[#F9C56C] mb-2">Team Member 3</label>
+                    <div className="space-y-2">
+                      <input type="text" placeholder="Name" className="w-full bg-[#1A1A1A] border border-[#755F42]/40 rounded px-4 py-2 text-[#E5E5E5]" />
+                      <input type="text" placeholder="Role" className="w-full bg-[#1A1A1A] border border-[#755F42]/40 rounded px-4 py-2 text-[#E5E5E5]" />
+                      <textarea placeholder="Bio" className="w-full bg-[#1A1A1A] border border-[#755F42]/40 rounded px-4 py-2 text-[#E5E5E5] h-16" />
+                      <label className="block px-4 py-2 bg-[#F9C56C] text-[#1F1F1F] rounded cursor-pointer text-sm font-serif text-center hover:bg-[#E5C050]">
+                        Upload Photo
+                        <input type="file" accept="image/*" className="hidden" />
+                      </label>
+                    </div>
+                  </div>
+                  <div className="border-t border-[#755F42]/30 pt-4">
+                    <label className="block text-sm font-serif text-[#F9C56C] mb-2">Team Member 4</label>
+                    <div className="space-y-2">
+                      <input type="text" placeholder="Name" className="w-full bg-[#1A1A1A] border border-[#755F42]/40 rounded px-4 py-2 text-[#E5E5E5]" />
+                      <input type="text" placeholder="Role" className="w-full bg-[#1A1A1A] border border-[#755F42]/40 rounded px-4 py-2 text-[#E5E5E5]" />
+                      <textarea placeholder="Bio" className="w-full bg-[#1A1A1A] border border-[#755F42]/40 rounded px-4 py-2 text-[#E5E5E5] h-16" />
+                      <label className="block px-4 py-2 bg-[#F9C56C] text-[#1F1F1F] rounded cursor-pointer text-sm font-serif text-center hover:bg-[#E5C050]">
+                        Upload Photo
+                        <input type="file" accept="image/*" className="hidden" />
+                      </label>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </div>
+          )}
+
+          {/* House Matrix Tab */}
+          {activeTab === 'matrix' && (
+            <div className="space-y-6">
+              <h2 className="text-2xl font-serif text-[#F9C56C] mb-6">— THE HOUSE MATRIX —</h2>
+              <div className="bg-[#0D0D0D] border border-[#755F42]/30 rounded-lg p-6 space-y-6">
+                <div>
+                  <label className="block text-sm font-serif text-[#F9C56C] mb-2">Section Title</label>
+                  <input
+                    type="text"
+                    value={config.houseMatrix.sectionTitle}
+                    onChange={e => setConfig({ ...config, houseMatrix: { ...config.houseMatrix, sectionTitle: e.target.value } })}
+                    placeholder="Two Portals, One Standard of Luxury"
+                    className="w-full bg-[#1A1A1A] border border-[#755F42]/40 rounded px-4 py-2 text-[#E5E5E5]"
+                  />
+                </div>
+
+                <div className="border-t border-[#755F42]/30 pt-4">
+                  <label className="block text-sm font-serif text-[#F9C56C] mb-2">Tokiotours Portal</label>
+                  <div className="space-y-2">
+                    <input
+                      type="text"
+                      value={config.houseMatrix.tokiotoursUrl}
+                      onChange={e => setConfig({ ...config, houseMatrix: { ...config.houseMatrix, tokiotoursUrl: e.target.value } })}
+                      placeholder="Portal URL"
+                      className="w-full bg-[#1A1A1A] border border-[#755F42]/40 rounded px-4 py-2 text-[#E5E5E5]"
+                    />
+                  </div>
+                </div>
+
+                <div className="border-t border-[#755F42]/30 pt-4">
+                  <label className="block text-sm font-serif text-[#F9C56C] mb-2">Elite Travel Portal</label>
+                  <div className="space-y-2">
+                    <input
+                      type="text"
+                      value={config.houseMatrix.eliteTravelUrl}
+                      onChange={e => setConfig({ ...config, houseMatrix: { ...config.houseMatrix, eliteTravelUrl: e.target.value } })}
+                      placeholder="Portal URL"
+                      className="w-full bg-[#1A1A1A] border border-[#755F42]/40 rounded px-4 py-2 text-[#E5E5E5]"
+                    />
+                  </div>
+                </div>
+              </div>
+            </div>
+          )}
+
+          {/* Themes Tab */}
+          {activeTab === 'themes' && (
+            <div className="space-y-6">
+              <h2 className="text-2xl font-serif text-[#F9C56C] mb-6">Color Themes & Font Sizes</h2>
+              <div className="bg-[#0D0D0D] border border-[#755F42]/30 rounded-lg p-6 space-y-6">
+                <div>
+                  <label className="block text-sm font-serif text-[#F9C56C] mb-4">Primary Colors</label>
+                  <div className="grid grid-cols-2 gap-4">
+                    <div>
+                      <label className="text-xs text-[#E5E5E5]/60 mb-1 block">Dark Background</label>
+                      <input type="color" defaultValue="#1F1F1F" className="w-full h-10 rounded cursor-pointer" />
+                    </div>
+                    <div>
+                      <label className="text-xs text-[#E5E5E5]/60 mb-1 block">Gold Accent</label>
+                      <input type="color" defaultValue="#F9C56C" className="w-full h-10 rounded cursor-pointer" />
+                    </div>
+                    <div>
+                      <label className="text-xs text-[#E5E5E5]/60 mb-1 block">Warm Brown</label>
+                      <input type="color" defaultValue="#755F42" className="w-full h-10 rounded cursor-pointer" />
+                    </div>
+                    <div>
+                      <label className="text-xs text-[#E5E5E5]/60 mb-1 block">Off-White</label>
+                      <input type="color" defaultValue="#E5E5E5" className="w-full h-10 rounded cursor-pointer" />
+                    </div>
+                  </div>
+                </div>
+
+                <div className="border-t border-[#755F42]/30 pt-4">
+                  <label className="block text-sm font-serif text-[#F9C56C] mb-4">Font Sizes</label>
+                  <div className="grid grid-cols-2 gap-4">
+                    <div>
+                      <label className="text-xs text-[#E5E5E5]/60 mb-1 block">Heading Font Size</label>
+                      <input type="text" placeholder="2xl, 3xl, 4xl" className="w-full bg-[#1A1A1A] border border-[#755F42]/40 rounded px-3 py-2 text-[#E5E5E5] text-sm" />
+                    </div>
+                    <div>
+                      <label className="text-xs text-[#E5E5E5]/60 mb-1 block">Body Font Size</label>
+                      <input type="text" placeholder="sm, base, lg" className="w-full bg-[#1A1A1A] border border-[#755F42]/40 rounded px-3 py-2 text-[#E5E5E5] text-sm" />
+                    </div>
+                    <div>
+                      <label className="text-xs text-[#E5E5E5]/60 mb-1 block">Tab Font Size</label>
+                      <input type="text" placeholder="xs, sm, base" className="w-full bg-[#1A1A1A] border border-[#755F42]/40 rounded px-3 py-2 text-[#E5E5E5] text-sm" />
+                    </div>
+                    <div>
+                      <label className="text-xs text-[#E5E5E5]/60 mb-1 block">Button Font Size</label>
+                      <input type="text" placeholder="sm, base, lg" className="w-full bg-[#1A1A1A] border border-[#755F42]/40 rounded px-3 py-2 text-[#E5E5E5] text-sm" />
+                    </div>
+                  </div>
+                </div>
+              </div>
             </div>
           )}
 
