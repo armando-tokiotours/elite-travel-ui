@@ -1,7 +1,7 @@
 /**
  * Headless WordPress client for Elite Travel XP.
  *
- * Uses `NEXT_PUBLIC_WORDPRESS_API` on the server and the `/blog/*` rewrite
+ * Uses `NEXT_PUBLIC_WORDPRESS_API_URL` on the server and the `/blog/*` rewrite
  * in the browser to avoid CORS. Falls back to editorial placeholders when
  * the API is unreachable.
  */
@@ -181,8 +181,8 @@ function mapCityCategory(term: WPTerm, country?: CountryCategory): CityCategory 
 
 export function getWordpressApiBase(): string {
   return (
-    process.env.NEXT_PUBLIC_WORDPRESS_API?.replace(/\/$/, "") ||
-    "https://tokiotours.jp/blog/wp-json/wp/v2"
+    process.env.NEXT_PUBLIC_WORDPRESS_API_URL?.replace(/\/$/, "") ||
+    "https://travelexperiencesgroup.com/blog/wp-json/wp/v2"
   );
 }
 

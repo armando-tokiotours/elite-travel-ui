@@ -1,0 +1,26 @@
+[
+  {
+    "id": "1",
+    "title": "TRANQUIL SUNRISE MOMENTS",
+    "description": "Private balcony, soft light, nowhere to rush.",
+    "image": "/assets/america1.png"
+  },
+  {
+    "id": "2",
+    "title": "TASTE WITH MAKERS",
+    "description": "Intimate tastings, never crowded tours.",
+    "image": "/assets/asia1.png"
+  },
+  {
+    "id": "3",
+    "title": "TIME TO YOURSELF",
+    "description": "Quiet corners and unhurried hours.",
+    "image": "/assets/europa1.png"
+  },
+  {
+    "id": "4",
+    "title": "PRIVATE & PERSONAL",
+    "description": "One dedicated host, your exact pace.",
+    "image": "/assets/room-all.png"
+  }
+]

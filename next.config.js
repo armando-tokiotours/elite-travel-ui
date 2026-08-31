@@ -10,10 +10,31 @@
  * @type {import('next').NextConfig}
  */
 const nextConfig = {
+  reactStrictMode: true,
+  images: {
+    unoptimized: true,
+    remotePatterns: [
+      {
+        protocol: 'https',
+        hostname: 'travelexperiencesgroup.com',
+        pathname: '/**',
+      },
+      {
+        protocol: 'https',
+        hostname: 'tokiotours.com',
+        pathname: '/**',
+      },
+      {
+        protocol: 'https',
+        hostname: 'elitetravelexp.com',
+        pathname: '/**',
+      },
+    ],
+  },
   async rewrites() {
     const wordpressApi = (
-      process.env.NEXT_PUBLIC_WORDPRESS_API ||
-      "https://tokiotours.jp/blog/wp-json/wp/v2"
+      process.env.NEXT_PUBLIC_WORDPRESS_API_URL ||
+      "https://travelexperiencesgroup.com/blog/wp-json/wp/v2"
     ).replace(/\/$/, "");
 
     return [
